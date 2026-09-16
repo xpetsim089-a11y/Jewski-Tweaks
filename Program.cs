@@ -114,6 +114,21 @@ namespace JewskiTweaksGUI
                 log => log(Sh.RestoreSvc(svc, revertStart)));
         }
 
+        // Removes one specific UWP app package (current user + provisioned, so it stays gone
+        // for new user accounts too). Not automatically reversible - matches how the big
+        // combined "Remove default bloat apps" tweak already documents itself; get it back
+        // from the Microsoft Store if you change your mind.
+        static Tweak RemoveApp(string cat, string display, string pkgId, string desc)
+        {
+            return T(cat, "Remove " + display + " app",
+                desc + " Not automatically reversible - reinstall from the Microsoft Store to get it back.",
+                RiskLevel.Moderate, false,
+                log => log(Sh.RunPS(
+                    "Get-AppxPackage -AllUsers \"*" + pkgId + "*\" | Remove-AppxPackage -EA SilentlyContinue; " +
+                    "Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like \"*" + pkgId + "*\" | Remove-AppxProvisionedPackage -Online -EA SilentlyContinue; 'done'")),
+                log => log("Not automatically reversible. Reinstall from the Microsoft Store if you want it back."));
+        }
+
         public static List<Tweak> Build()
         {
             var list = new List<Tweak>();
@@ -568,6 +583,24 @@ namespace JewskiTweaksGUI
                 RiskLevel.Safe, false,
                 log => { log(Sh.Reg("add \"HKCU\\Control Panel\\Keyboard\" /v KeyboardDelay /t REG_SZ /d 0 /f")); log(Sh.Reg("add \"HKCU\\Control Panel\\Keyboard\" /v KeyboardSpeed /t REG_SZ /d 31 /f")); },
                 log => { log(Sh.Reg("add \"HKCU\\Control Panel\\Keyboard\" /v KeyboardDelay /t REG_SZ /d 1 /f")); log(Sh.Reg("add \"HKCU\\Control Panel\\Keyboard\" /v KeyboardSpeed /t REG_SZ /d 31 /f")); }));
+
+            l.Add(T(CAT_INPUT, "Enable Num Lock at startup",
+                "Turns Num Lock on by default every boot, before you even sign in.",
+                RiskLevel.Safe, true,
+                log => log(Sh.Reg("add \"HKU\\.DEFAULT\\Control Panel\\Keyboard\" /v InitialKeyboardIndicators /t REG_SZ /d 2 /f")),
+                log => log(Sh.Reg("add \"HKU\\.DEFAULT\\Control Panel\\Keyboard\" /v InitialKeyboardIndicators /t REG_SZ /d 0 /f"))));
+
+            l.Add(T(CAT_INPUT, "Increase mouse wheel scroll lines",
+                "Scrolls more lines per wheel notch (default is 3) for faster document/page scrolling.",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKCU\\Control Panel\\Desktop\" /v WheelScrollLines /t REG_SZ /d 6 /f")),
+                log => log(Sh.Reg("add \"HKCU\\Control Panel\\Desktop\" /v WheelScrollLines /t REG_SZ /d 3 /f"))));
+
+            l.Add(T(CAT_INPUT, "Snap mouse cursor to default dialog button",
+                "When a dialog box opens, the cursor jumps straight to its default (highlighted) button.",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKCU\\Control Panel\\Mouse\" /v SnapToDefaultButton /t REG_SZ /d 1 /f")),
+                log => log(Sh.Reg("add \"HKCU\\Control Panel\\Mouse\" /v SnapToDefaultButton /t REG_SZ /d 0 /f"))));
         }
 
         static void Visuals(List<Tweak> l)
@@ -639,6 +672,24 @@ namespace JewskiTweaksGUI
                     log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v HideSCAMeetNow /t REG_DWORD /d 0 /f"));
                     log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowTaskViewButton /t REG_DWORD /d 1 /f"));
                 }));
+
+            l.Add(T(CAT_VISUAL, "Disable Aero Shake (minimize other windows by shaking one)",
+                "Stops the accidental 'shake a window to minimize everything else' gesture some people trigger by mistake while dragging.",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v DisallowShaking /t REG_DWORD /d 1 /f")),
+                log => log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v DisallowShaking /t REG_DWORD /d 0 /f"))));
+
+            l.Add(T(CAT_VISUAL, "Disable Snap Assist suggestions",
+                "Stops Windows from popping up 'snap this window here too' suggestions after you snap a window to the side.",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v SnapAssist /t REG_DWORD /d 0 /f")),
+                log => log(Sh.Reg("add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v SnapAssist /t REG_DWORD /d 1 /f"))));
+
+            l.Add(T(CAT_VISUAL, "Show seconds in the system tray clock",
+                "Adds a seconds counter to the taskbar clock (off by default).",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowSecondsInSystemClock /t REG_DWORD /d 1 /f")),
+                log => log(Sh.Reg("add \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v ShowSecondsInSystemClock /t REG_DWORD /d 0 /f"))));
         }
 
         static void Privacy(List<Tweak> l)
@@ -972,6 +1023,23 @@ namespace JewskiTweaksGUI
                 RiskLevel.Safe, false,
                 log => log(Sh.Reg("add \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\" /v EnableAutoTray /t REG_DWORD /d 0 /f")),
                 log => log(Sh.Reg("add \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\" /v EnableAutoTray /t REG_DWORD /d 1 /f"))));
+
+            // Individual app removals for packages not covered by the combined bloat-removal
+            // tweak above - kept separate so you can pick and choose instead of an all-or-nothing list.
+            l.Add(RemoveApp(CAT_DEBLOAT, "Xbox", "Microsoft.XboxApp", "The standalone Xbox Console Companion app (not Xbox Game Bar)."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Xbox Identity Provider", "Microsoft.XboxIdentityProvider", "Background Xbox sign-in helper used by the Xbox app/Game Bar."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Xbox Speech To Text Overlay", "Microsoft.XboxSpeechToTextOverlay", "Accessibility overlay for Xbox party chat captions; unused unless you use that feature."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Cortana", "Microsoft.549981C3F5F10", "The Cortana app package itself (separate from the Cortana service toggle above)."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Outlook for Windows", "Microsoft.OutlookForWindows", "The new consumer Outlook app preinstalled on recent Windows 10/11 builds."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Teams (consumer)", "MicrosoftTeams", "The consumer/personal Microsoft Teams app preinstalled by Windows (not the work/school Teams you install yourself)."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Family Safety", "MicrosoftCorporationII.MicrosoftFamily", "Parental-controls companion app; unused if you don't use Family Safety."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Power Automate", "Microsoft.PowerAutomateDesktop", "Preinstalled workflow-automation app most people never open."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Quick Assist", "MicrosoftCorporationII.QuickAssist", "Remote-assistance app; safe to remove and reinstall later if you ever need to give/get remote help."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Xbox Gaming App", "Microsoft.GamingApp", "The newer Xbox app (replaces the older Xbox Console Companion on some builds)."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Widgets / News and Interests", "MicrosoftWindows.Client.WebExperience", "The Widgets board content app powering the taskbar weather/news widget."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Dev Home", "Microsoft.Windows.DevHome", "Developer dashboard app preinstalled on some newer builds; irrelevant unless you're a developer using it."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Remote Desktop (modern client)", "Microsoft.RemoteDesktop", "The Store-based Remote Desktop client app (not the built-in mstsc.exe, which stays either way)."));
+            l.Add(RemoveApp(CAT_DEBLOAT, "Paid Wi-Fi & Cellular", "Microsoft.OneConnect", "Carrier Wi-Fi/data-plan purchase app, unused on a desktop PC."));
         }
 
         static void ServicesSafe(List<Tweak> l)
@@ -1006,6 +1074,37 @@ namespace JewskiTweaksGUI
             l.Add(Svc(CAT_SVC, "Distributed Link Tracking Client", "TrkWks", "Tracks shortcuts across NTFS volumes; irrelevant for a single-drive gaming PC.", RiskLevel.Safe, true, "demand"));
             l.Add(Svc(CAT_SVC, "Clipboard User Service", "cbdhsvc", "Powers cloud clipboard sync only; local Win+V history still works.", RiskLevel.Safe, false, "demand"));
             l.Add(Svc(CAT_SVC, "Edge auto-update", "edgeupdate", "Edge won't auto-update in the background (it still runs fine).", RiskLevel.Moderate, true, "demand"));
+            l.Add(Svc(CAT_SVC, "AllJoyn Router Service", "AJRouter", "IoT device discovery protocol, essentially unused on a normal PC.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Application Layer Gateway Service", "ALG", "Legacy NAT helper for old protocols (FTP/some VoIP); most software doesn't need it.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Cellular Time", "autotimesvc", "Only relevant for PCs with a cellular modem.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Certificate Propagation", "CertPropSvc", "Only needed for smart-card certificate propagation.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "COM+ System Application", "COMSysApp", "Legacy COM+ component hosting, rarely used by modern apps.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Contact Data", "PimIndexMaintenanceSvc", "Indexes contacts for the People app.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Data Sharing Service", "DsSvc", "Background app-to-app data sharing, rarely used.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Device Setup Manager", "DsmSvc", "Handles first-time setup UI for newly connected devices.", RiskLevel.Safe, false, "demand"));
+            l.Add(Svc(CAT_SVC, "DevQuery Background Discovery Broker", "DevQueryBroker", "Background device-query API used by a handful of UWP apps.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Enterprise App Management Service", "EntAppSvc", "Enterprise device-management feature, unused on a personal PC.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Infrared monitor service", "irmon", "Only relevant if your PC has an infrared (IrDA) port.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Net.Tcp Port Sharing Service", "NetTcpPortSharing", "WCF port-sharing for .NET dev tools; disabled by default already on most systems.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Network Connected Devices Auto-Setup", "NcdAutoSetup", "Auto-detects and sets up media devices/printers on your network.", RiskLevel.Safe, false, "demand"));
+            l.Add(Svc(CAT_SVC, "Network Connectivity Assistant", "NcaSvc", "Corporate DirectAccess connectivity helper, unused without a domain.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Network Setup Service", "NetSetupSvc", "Only active while running the network setup wizard.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Optimize Drives (scheduled)", "defragsvc", "Disables the background service that runs scheduled drive optimization/TRIM. You can still run it manually.", RiskLevel.Moderate, false, "demand"));
+            l.Add(Svc(CAT_SVC, "Performance Counter DLL Host", "PerfHost", "Hosts 32-bit performance counters for 64-bit Windows; only used by some monitoring tools.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Performance Logs & Alerts", "pla", "Collects performance data when you run Performance Monitor data collector sets.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "PNRP Machine Name Publication Service", "PNRPsvc", "Peer name resolution, used by very little modern software.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Peer Networking Grouping", "p2psvc", "Peer-to-peer grouping API, rarely used outside HomeGroup-era features.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Peer Networking Identity Manager", "p2pimsvc", "Companion to Peer Networking Grouping.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Routing and Remote Access", "RemoteAccess", "Router/NAT/dial-up service; disabled by default on consumer Windows already.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Sensor Data Service", "SensorDataService", "Only relevant on devices with ambient light/accelerometer sensors.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Sensor Monitoring Service", "SensrSvc", "Only relevant on devices with hardware sensors.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Sensor Service", "SensorService", "Only relevant on devices with hardware sensors.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Spot Verifier", "svsvc", "Runs a disk-verification check after an unexpected shutdown; rarely triggers.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "User Access Logging Service", "UalSvc", "Enterprise licensing-usage logging, unused on a personal PC.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "WMI Performance Adapter", "wmiApSrv", "Only used when a performance-monitoring tool queries WMI perf counters.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Windows Insider Service", "wisvc", "Powers enrollment in the Windows Insider preview program.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "Windows Encryption Provider Host Service", "WEPHOSTSVC", "Rarely-used encryption provider host for niche hardware encryption features.", RiskLevel.Safe, true, "demand"));
+            l.Add(Svc(CAT_SVC, "UPnP Device Host", "upnphost", "Pairs with SSDP Discovery for smart-TV casting/DLNA; disable both together if you don't cast.", RiskLevel.Moderate, false, "demand"));
         }
 
         static void ServicesAdvanced(List<Tweak> l)
@@ -1037,6 +1136,25 @@ namespace JewskiTweaksGUI
             l.Add(Svc(CAT_SVC_ADV, "Windows Time", "W32Time", "Causes your system clock to drift over time (breaks online-game anti-cheat time checks, certificate validation).", RiskLevel.Advanced, false, "auto"));
             l.Add(Svc(CAT_SVC_ADV, "User Data Access / Token Broker", "TokenBroker", "BREAKS Microsoft account sign-in for some Store apps.", RiskLevel.Advanced, false, "demand"));
             l.Add(Svc(CAT_SVC_ADV, "Microsoft Account Sign-in Assistant", "wlidsvc", "BREAKS Microsoft account sign-in system-wide (Store, Xbox, OneDrive).", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Human Interface Device Service", "hidserv", "BREAKS special multimedia/hotkey buttons on some keyboards and remotes.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "IKE and AuthIP IPsec Keying Modules", "IKEEXT", "BREAKS IPsec-based VPN connections.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Microsoft Passport", "NgcSvc", "BREAKS Windows Hello PIN sign-in.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Microsoft Passport Container", "NgcCtnrSvc", "BREAKS Windows Hello PIN sign-in (companion service to Microsoft Passport).", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Netlogon", "Netlogon", "BREAKS domain sign-in. Irrelevant if this PC isn't on a Windows domain, but risky to disable blindly.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Program Compatibility Assistant Service", "PcaSvc", "BREAKS the compatibility-warning prompts and auto-fixes for older apps.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Quality Windows Audio Video Experience", "QWAVE", "BREAKS network QoS prioritization used by some audio/video streaming apps.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Radio Management Service", "RmSvc", "BREAKS the Wi-Fi/Bluetooth radio on-off switch (airplane mode toggle) on some laptops.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Shell Hardware Detection", "ShellHWDetection", "BREAKS AutoPlay prompts when inserting USB drives/discs.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Storage Service", "StorSvc", "BREAKS some removable-storage notifications and Storage Sense.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Tablet PC Input Service", "TabletInputService", "BREAKS the touch keyboard and pen/touch input on 2-in-1 and touchscreen devices.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "TCP/IP NetBIOS Helper", "lmhosts", "BREAKS legacy NetBIOS name resolution (some older LAN printers/file shares rely on this).", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Virtual Disk", "vds", "BREAKS Disk Management and other disk-partitioning tools.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Wi-Fi Direct Services Connection Manager", "WFDSvc", "BREAKS wireless display projection (Miracast).", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Windows Camera Frame Server", "FrameServer", "BREAKS webcam access in apps like Zoom, Discord and Teams.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Windows Driver Foundation - User-mode Driver Framework", "wudfsvc", "BREAKS many USB/HID peripherals (mice, printers, card readers) that use UMDF drivers.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Windows License Manager Service", "LicenseManager", "BREAKS Microsoft Store app licensing checks.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "WWAN AutoConfig", "WwanSvc", "BREAKS mobile broadband/cellular modem connections.", RiskLevel.Advanced, false, "demand"));
+            l.Add(Svc(CAT_SVC_ADV, "Diagnostic Policy Service", "DPS", "BREAKS Windows troubleshooters and several diagnostic-dependent Settings pages.", RiskLevel.Advanced, false, "auto"));
         }
 
         static void Tasks(List<Tweak> l)
@@ -1192,6 +1310,18 @@ namespace JewskiTweaksGUI
                 RiskLevel.Advanced, false,
                 log => { log(Sh.Reg("add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel\" /v GlobalTimerResolutionRequests /t REG_DWORD /d 1 /f")); log(Sh.Reg("add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel\" /v DistributeTimers /t REG_DWORD /d 1 /f")); },
                 log => { log(Sh.Reg("delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel\" /v GlobalTimerResolutionRequests /f")); log(Sh.Reg("delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel\" /v DistributeTimers /f")); }));
+
+            l.Add(T(CAT_RAM, "Disable memory compression",
+                "MODERATE trade-off: Windows normally compresses idle memory pages in RAM to fit more before it needs to page to disk. Disabling it frees up CPU cycles at the cost of slightly higher real RAM usage - only worth it if you have plenty of RAM to spare.",
+                RiskLevel.Moderate, false,
+                log => log(Sh.RunPS("Disable-MMAgent -MemoryCompression")),
+                log => log(Sh.RunPS("Enable-MMAgent -MemoryCompression"))));
+
+            l.Add(T(CAT_RAM, "Increase system large-cache boost",
+                "Legacy 'optimize for system performance' file-cache setting from the old Server/Workstation dialog. Mostly a no-op on modern Windows but harmless to set.",
+                RiskLevel.Safe, false,
+                log => log(Sh.Reg("add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v LargeSystemCache /t REG_DWORD /d 1 /f")),
+                log => log(Sh.Reg("add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v LargeSystemCache /t REG_DWORD /d 0 /f"))));
         }
     }
 
@@ -1201,29 +1331,40 @@ namespace JewskiTweaksGUI
         // Exact palette pulled from the real jewskitweaks.builtwithrocket.new CSS (:root tokens).
         static readonly Color AppBg = Color.FromArgb(0xF5, 0xF3, 0xEE);       // --card
         static readonly Color PanelBg = Color.FromArgb(0xF5, 0xF3, 0xEE);
-        static readonly Color PanelBg2 = Color.FromArgb(0xF5, 0xF3, 0xEE);
         static readonly Color RowA = Color.FromArgb(0xF5, 0xF3, 0xEE);
         static readonly Color RowB = Color.FromArgb(0xF5, 0xF3, 0xEE);
-        static readonly Color RowSelected = Color.FromArgb(0x7B, 0x2F, 0xBE);  // --primary (selected tweak fill)
         static readonly Color Border = Color.FromArgb(0x11, 0x11, 0x11);      // --border
-        static readonly Color NavBg = Color.FromArgb(0xF5, 0xF3, 0xEE);
-        static readonly Color NavHover = Color.FromArgb(0x2a, 0x2a, 0x2a);
-        static readonly Color NavSelected = Color.FromArgb(0x7B, 0x2F, 0xBE);
+        static readonly Color NavBg = Color.FromArgb(0x1A, 0x1A, 0x24); // .sidebar (dark, per the tab-btn HTML)
         static readonly Color TextPrimary = Color.FromArgb(0x11, 0x11, 0x11); // --foreground
         static readonly Color TextMuted = Color.FromArgb(0x99, 0x99, 0x99);
         static readonly Color AccentPurple = Color.FromArgb(0x7B, 0x2F, 0xBE); // --primary
         static readonly Color AccentPurpleDark = Color.FromArgb(0x63, 0x25, 0x99);
         static readonly Color AccentPurpleDim = Color.FromArgb(0xC0, 0x84, 0xFC); // --accent (selected-tweak border)
-        static readonly Color SafeColor = Color.FromArgb(0x2E, 0x7D, 0x32);    // --green-spec (GPU)
-        static readonly Color ModerateColor = Color.FromArgb(0x3F, 0x51, 0xB5); // --blue-spec (CPU)
-        static readonly Color AdvancedColor = Color.FromArgb(0xE5, 0x39, 0x35); // --red-spec (Motherboard)
         static readonly Color PillBlack = Color.FromArgb(0x11, 0x11, 0x11);    // .tab-btn-inactive / .tweak-btn-unselected
         static readonly Color PillBlackHover = Color.FromArgb(0x28, 0x28, 0x28);
         static readonly Color PillGreen = Color.FromArgb(0x1F, 0xBE, 0x6E);    // --secondary (Apply buttons)
         static readonly Color PillGreenDark = Color.FromArgb(0x18, 0x9A, 0x58);
         static readonly Color PillSelected = Color.FromArgb(0x7B, 0x2F, 0xBE); // .tweak-btn-selected
         static readonly Color DiscordBlurple = Color.FromArgb(0x58, 0x65, 0xF2);
-        static readonly Color DividerSoft = Color.FromArgb(0xD0, 0xCC, 0xC4);  // .premium-divider
+
+        // Home page is back to the light theme (see BuildWelcomePage) - this is now only the
+        // accent purple used for the sidebar logo ring, nav-pill hover border, and toast border.
+        static readonly Color HomeAccentPurple = Color.FromArgb(0x8A, 0x2B, 0xE2);
+        static readonly Color HomePurple = Color.FromArgb(0x3D, 0x1A, 0x5C); // Home page background
+        static readonly Color SafeColor = Color.FromArgb(0x2E, 0x7D, 0x32);    // GPU spec value
+        static readonly Color ModerateColor = Color.FromArgb(0x3F, 0x51, 0xB5); // CPU spec value
+        static readonly Color AdvancedColor = Color.FromArgb(0xE5, 0x39, 0x35); // Motherboard spec value
+
+        // Sidebar nav pills - also pulled from this HTML's .tab-btn / .tab-btn.active, since
+        // the user asked for the tab/category buttons to match it too (applies everywhere,
+        // not just Home, since the sidebar is shared across all pages).
+        static readonly Color NavDivider = Color.FromArgb(0x26, 0x26, 0x36);    // .sidebar border-right
+        static readonly Color NavPillBg = Color.FromArgb(0x0F, 0x0F, 0x14);     // .tab-btn
+        static readonly Color NavPillBorder = Color.FromArgb(0x2A, 0x2A, 0x3A);
+        static readonly Color NavPillText = Color.FromArgb(0xA0, 0xA0, 0xB0);
+        static readonly Color NavPillHoverBg = Color.FromArgb(0x23, 0x23, 0x32);
+        static readonly Color NavPillActiveStart = Color.FromArgb(0x8A, 0x2B, 0xE2);
+        static readonly Color NavPillActiveEnd = Color.FromArgb(0x5A, 0x18, 0x9A);
 
         // Georgia is the target (matches the real site's headings), but on a machine where
         // it's missing GDI+ silently substitutes without erroring - so this picks the first
@@ -1413,12 +1554,104 @@ namespace JewskiTweaksGUI
 
             Controls.Add(_busyOverlay);
             _busyOverlay.BringToFront();
+
+            BuildToast();
+        }
+
+        // Bottom-center toast, replacing the old "About to apply..." MessageBox popups for
+        // quick confirmations - a dark pill with a green check badge that slides up from the
+        // bottom edge, holds, then slides back down, instead of just popping in/out.
+        Panel _toast;
+        Panel _toastBadge;
+        Label _toastLabel;
+        System.Windows.Forms.Timer _toastTimer;
+        System.Windows.Forms.Timer _toastAnimTimer;
+        int _toastTargetY, _toastHiddenY;
+
+        void BuildToast()
+        {
+            _toast = new Panel { Size = new Size(10, 46), BackColor = Color.FromArgb(0x16, 0x16, 0x20), Visible = false };
+            _toast.Paint += (s, e) => {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var path = RoundedRect(new Rectangle(0, 0, Math.Max(_toast.Width - 1, 1), Math.Max(_toast.Height - 1, 1)), _toast.Height / 2))
+                {
+                    e.Graphics.FillPath(new SolidBrush(_toast.BackColor), path);
+                    using (var pen = new Pen(HomeAccentPurple, 1.4f)) e.Graphics.DrawPath(pen, path);
+                }
+            };
+
+            _toastBadge = new Panel { Size = new Size(24, 24), Location = new Point(11, 11), BackColor = PillGreen };
+            RoundCorners(_toastBadge, 12);
+            var check = new Label { Text = "✓", ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
+            _toastBadge.Controls.Add(check);
+            _toast.Controls.Add(_toastBadge);
+
+            _toastLabel = new Label { AutoSize = true, ForeColor = Color.White, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), Location = new Point(45, 15) };
+            _toast.Controls.Add(_toastLabel);
+
+            Controls.Add(_toast);
+            _toast.BringToFront();
+
+            _toastTimer = new System.Windows.Forms.Timer { Interval = 2400 };
+            _toastTimer.Tick += (s, e) => { _toastTimer.Stop(); AnimateToast(false); };
+
+            _toastAnimTimer = new System.Windows.Forms.Timer { Interval = 12 };
+            _toastAnimTimer.Tick += (s, e) => {
+                int dy = _toastTargetY - _toast.Top;
+                if (Math.Abs(dy) <= 2) { _toast.Top = _toastTargetY; _toastAnimTimer.Stop(); if (_toastTargetY == _toastHiddenY) _toast.Visible = false; return; }
+                _toast.Top += dy / 3;
+            };
+        }
+
+        void AnimateToast(bool show)
+        {
+            _toastTargetY = show ? ClientSize.Height - 74 : _toastHiddenY;
+            _toastAnimTimer.Stop();
+            _toastAnimTimer.Start();
+        }
+
+        void ShowToast(string message)
+        {
+            if (InvokeRequired) { Invoke((MethodInvoker)(() => ShowToast(message))); return; }
+            _toastLabel.Text = message;
+            int w = _toastLabel.PreferredWidth + 65;
+            _toast.Size = new Size(w, 46);
+            _toastHiddenY = ClientSize.Height + 10;
+            _toast.Location = new Point((ClientSize.Width - w) / 2, _toast.Visible ? _toast.Top : _toastHiddenY);
+            _toast.Visible = true;
+            _toast.BringToFront();
+            AnimateToast(true);
+            _toastTimer.Stop();
+            _toastTimer.Start();
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
             PlaySound("JewskiTweaksGUI.Resources.launch.mp3", "jewskilaunch");
+        }
+
+        // Faded logo watermark shown behind every category/tweak page's grid, baked once at
+        // a fixed size + alpha so pages just draw it instead of re-loading/re-blending the
+        // source PNG on every single page.
+        static Bitmap _tabWatermark;
+        static Bitmap TabWatermark()
+        {
+            if (_tabWatermark != null) return _tabWatermark;
+            var logo = LoadEmbeddedLogo();
+            if (logo == null) return null;
+            const int size = 340;
+            var bmp = new Bitmap(size, size);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                var attrs = new System.Drawing.Imaging.ImageAttributes();
+                var matrix = new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.16f };
+                attrs.SetColorMatrix(matrix, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
+                g.DrawImage(logo, new Rectangle(0, 0, size, size), 0, 0, logo.Width, logo.Height, GraphicsUnit.Pixel, attrs);
+            }
+            _tabWatermark = bmp;
+            return _tabWatermark;
         }
 
         static Bitmap LoadEmbeddedLogo()
@@ -1439,31 +1672,57 @@ namespace JewskiTweaksGUI
         // banner) — matches the mockup, where the brand mark lives above the tab pills.
         Panel BuildSidebarLogo()
         {
-            var block = new Panel { Dock = DockStyle.Top, Height = 128, BackColor = NavBg };
+            var block = new Panel { Dock = DockStyle.Top, Height = 142, BackColor = NavBg };
+            var logo = MakeCircleLogo(80, 2, HomeAccentPurple);
+            logo.Location = new Point((block.Width - logo.Width) / 2, 14);
+            logo.Anchor = AnchorStyles.Top; // re-centers if the sidebar width ever changes
+            block.Controls.Add(logo);
+            var title = new Label
+            {
+                Text = "Jewski Free",
+                ForeColor = Color.White,
+                Font = SerifBold(15F),
+                AutoSize = false,
+                Size = new Size(block.Width, 26),
+                Location = new Point(0, 102),
+                TextAlign = ContentAlignment.TopCenter,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Transparent
+            };
+            block.Controls.Add(title);
+            EventHandler recenter = (s, e) => {
+                logo.Location = new Point((block.Width - logo.Width) / 2, 14);
+                title.Width = block.Width;
+            };
+            block.Resize += recenter;
+            block.HandleCreated += recenter;
+            return block;
+        }
+
+        // Circular avatar-style logo with a colored ring around it (.sidebar-logo /
+        // .header-logo in the HTML: border-radius:50% + a purple border). Achieved with an
+        // outer ring-colored circle and a slightly smaller inset picture, rather than trying
+        // to stroke a border on top of the image (paint-order/anti-aliasing headache).
+        Panel MakeCircleLogo(int size, int ringWidth, Color ringColor)
+        {
+            var outer = new Panel { Size = new Size(size, size), BackColor = ringColor };
+            RoundCorners(outer, size / 2);
             var logoImg = LoadEmbeddedLogo();
             if (logoImg != null)
             {
-                var logoBox = new PictureBox
+                int innerSize = size - ringWidth * 2;
+                var pic = new PictureBox
                 {
                     Image = logoImg,
                     SizeMode = PictureBoxSizeMode.Zoom,
-                    Size = new Size(66, 66),
-                    Location = new Point(18, 14),
-                    BackColor = Color.Transparent
+                    Size = new Size(innerSize, innerSize),
+                    Location = new Point(ringWidth, ringWidth),
+                    BackColor = Color.Black
                 };
-                block.Controls.Add(logoBox);
+                RoundCorners(pic, innerSize / 2);
+                outer.Controls.Add(pic);
             }
-            var title = new Label
-            {
-                Text = "Jewski Tweaks",
-                ForeColor = TextPrimary,
-                Font = SerifBold(15F),
-                AutoSize = true,
-                BackColor = Color.Transparent,
-                Location = new Point(16, 88)
-            };
-            block.Controls.Add(title);
-            return block;
+            return outer;
         }
 
         int CountCategories()
@@ -1480,7 +1739,7 @@ namespace JewskiTweaksGUI
             _contentHost = new Panel { Dock = DockStyle.Fill, BackColor = AppBg };
 
             var navOuter = new Panel { Dock = DockStyle.Left, Width = 250, BackColor = NavBg };
-            var navRightBorder = new Panel { Dock = DockStyle.Right, Width = 1, BackColor = Border };
+            var navRightBorder = new Panel { Dock = DockStyle.Right, Width = 1, BackColor = NavDivider };
             var navLogo = BuildSidebarLogo();
             _navFlow = new FlowLayoutPanel
             {
@@ -1512,15 +1771,33 @@ namespace JewskiTweaksGUI
                 byCat[t.Category].Add(t);
             }
 
-            foreach (var cat in order)
+            // Grouped nav order with section headers, instead of one flat list of 14 pills -
+            // related categories now sit together under a small caption.
+            var groups = new[] {
+                new { Header = "PERFORMANCE", Cats = new[] { "POWER && CPU", "RAM && BOOT TUNING", "STORAGE && CLEANUP" } },
+                new { Header = "NETWORK", Cats = new[] { "NETWORK && ETHERNET" } },
+                new { Header = "AUDIO & INPUT", Cats = new[] { "AUDIO", "INPUT" } },
+                new { Header = "VISUALS", Cats = new[] { "VISUAL EFFECTS && UI" } },
+                new { Header = "GAMING", Cats = new[] { "GAMING && GPU" } },
+                new { Header = "PRIVACY", Cats = new[] { "PRIVACY && TELEMETRY" } },
+                new { Header = "SYSTEM", Cats = new[] { "STARTUP (REGISTRY)", "DEBLOAT", "SERVICES", "SERVICES (ADVANCED)", "SCHEDULED TASKS" } },
+            };
+
+            foreach (var group in groups)
             {
-                var page = BuildTweakPage(cat, byCat[cat]);
-                var navItem = MakeNavItem("●", cat, byCat[cat].Count.ToString(), page);
-                _navFlow.Controls.Add(navItem);
-                _contentHost.Controls.Add(page);
-                _categoryNavItems[cat] = navItem;
-                _categoryPages[cat] = page;
-                if (_firstCategoryNav == null) { _firstCategoryNav = navItem; _firstCategoryPage = page; }
+                bool headerAdded = false;
+                foreach (var cat in group.Cats)
+                {
+                    if (!byCat.ContainsKey(cat)) continue;
+                    if (!headerAdded) { _navFlow.Controls.Add(MakeNavGroupHeader(group.Header)); headerAdded = true; }
+                    var page = BuildTweakPage(cat, byCat[cat]);
+                    var navItem = MakeNavItem("●", cat, byCat[cat].Count.ToString(), page);
+                    _navFlow.Controls.Add(navItem);
+                    _contentHost.Controls.Add(page);
+                    _categoryNavItems[cat] = navItem;
+                    _categoryPages[cat] = page;
+                    if (_firstCategoryNav == null) { _firstCategoryNav = navItem; _firstCategoryPage = page; }
+                }
             }
 
             var startupPage = BuildStartupAppsPage();
@@ -1569,41 +1846,84 @@ namespace JewskiTweaksGUI
             return sep;
         }
 
+        Label MakeNavGroupHeader(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                Width = 230,
+                Height = 24,
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                ForeColor = NavPillText,
+                Padding = new Padding(4, 10, 0, 0),
+                Margin = new Padding(0, 4, 0, 2),
+                BackColor = NavBg,
+                Tag = "navheader"
+            };
+        }
+
         static string Disp(string s)
         {
             return string.IsNullOrEmpty(s) ? s : s.Replace("&&", "&");
         }
 
+        // Matches the HTML's .tab-btn exactly: dark pill with a subtle border, hover lightens
+        // the fill and borders purple, active gets the purple gradient fill with no border.
         Panel MakeNavItem(string icon, string label, string count, Panel page)
         {
             // icon is ignored - the real site's tab pills are plain centered text, no icons.
             string full = Disp(label);
-            var item = new Panel { Width = 230, Height = 56, BackColor = PillBlack, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 12), Tag = "navpill" };
+            var item = new Panel { Width = 230, Height = 50, BackColor = NavBg, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 0, 10), Tag = "navpill" };
+            bool hover = false;
             var lbl = new Label
             {
                 Text = full,
                 UseMnemonic = false,
                 AutoEllipsis = true,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = NavPillText,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
                 BackColor = Color.Transparent
             };
             item.Controls.Add(lbl);
-            RoundCorners(item, 28);
+            RoundCorners(item, item.Height / 2);
+
+            item.Paint += (s, e) => {
+                bool active = _selectedNavItem == item;
+                lbl.ForeColor = active || hover ? Color.White : NavPillText;
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                var rect = new Rectangle(0, 0, item.Width - 1, item.Height - 1);
+                using (var path = RoundedRect(rect, item.Height / 2))
+                {
+                    if (active)
+                    {
+                        using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(rect, NavPillActiveStart, NavPillActiveEnd, 45f))
+                            e.Graphics.FillPath(brush, path);
+                    }
+                    else
+                    {
+                        using (var brush = new SolidBrush(hover ? NavPillHoverBg : NavPillBg))
+                            e.Graphics.FillPath(brush, path);
+                        using (var pen = new Pen(hover ? HomeAccentPurple : NavPillBorder, 1))
+                            e.Graphics.DrawPath(pen, path);
+                    }
+                }
+            };
+
             EventHandler click = (s, e) => SelectPage(item, page);
             item.Click += click; lbl.Click += click;
-            item.MouseEnter += (s, e) => { if (_selectedNavItem != item) item.BackColor = PillBlackHover; };
-            item.MouseLeave += (s, e) => { if (_selectedNavItem != item) item.BackColor = PillBlack; };
+            item.MouseEnter += (s, e) => { hover = true; item.Invalidate(); };
+            item.MouseLeave += (s, e) => { hover = false; item.Invalidate(); };
             return item;
         }
 
         void SelectPage(Panel navItem, Panel page)
         {
-            if (_selectedNavItem != null) _selectedNavItem.BackColor = PillBlack;
-            navItem.BackColor = AccentPurple;
+            var prev = _selectedNavItem;
             _selectedNavItem = navItem;
+            if (prev != null) prev.Invalidate();
+            navItem.Invalidate();
             foreach (var p in _pages) p.Visible = (p == page);
             page.Visible = true;
             page.BringToFront();
@@ -1680,35 +2000,18 @@ namespace JewskiTweaksGUI
             catch { return "Unknown"; }
         }
 
-        Panel MakePremiumDivider()
-        {
-            var div = new Panel { Dock = DockStyle.Top, Height = 18, BackColor = AppBg };
-            div.Paint += (s, e) => {
-                var rect = new Rectangle(0, 8, div.Width, 1);
-                if (rect.Width <= 0) return;
-                using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(0, 0, Math.Max(rect.Width, 1), 1), DividerSoft, DividerSoft, 0f))
-                {
-                    var blend = new System.Drawing.Drawing2D.ColorBlend(3);
-                    blend.Colors = new[] { Color.Transparent, DividerSoft, Color.Transparent };
-                    blend.Positions = new[] { 0f, 0.5f, 1f };
-                    brush.InterpolationColors = blend;
-                    e.Graphics.FillRectangle(brush, rect);
-                }
-            };
-            return div;
-        }
-
-        Label MakeEyebrow(string text)
-        {
-            return new Label { Text = text, Dock = DockStyle.Top, Height = 20, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(0x99, 0x99, 0x99) };
-        }
-
+        // Home tab redesign - the user supplied an exact HTML/CSS spec for this page (dark
+        // card-based "WELCOME BACK" dashboard) and asked for it specifically here; the rest
+        // of the app keeps the light theme from the real site, this page alone goes dark.
+        // Home page - back to the very first light-theme design (logo+heading left, MADE BY
+        // JEWSKI+logo+restore button right, click-to-copy Discord line, color-coded specs).
+        // The "SYSTEM OVERVIEW" dark glass version is gone - it's what was causing the lag
+        // complaints, on top of the user simply preferring this look.
         Panel BuildWelcomePage()
         {
-            var page = new Panel { Dock = DockStyle.Fill, Visible = false, BackColor = AppBg, Padding = new Padding(40, 40, 40, 40), AutoScroll = true };
+            var page = new Panel { Dock = DockStyle.Fill, Visible = false, BackColor = HomePurple, Padding = new Padding(40, 40, 40, 40), AutoScroll = true };
             _pages.Add(page);
 
-            // ---------- Header: logo + heading (left), MADE BY JEWSKI + restore button (right) ----------
             var headerRow = new Panel { Dock = DockStyle.Top, Height = 76 };
             var logoImg2 = LoadEmbeddedLogo();
             if (logoImg2 != null)
@@ -1716,13 +2019,13 @@ namespace JewskiTweaksGUI
                 var logoBox2 = new PictureBox { Image = logoImg2, SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(64, 64), Location = new Point(0, 0), BackColor = Color.Transparent };
                 headerRow.Controls.Add(logoBox2);
             }
-            var h1 = new Label { Text = "HOPEFULLY YOU'LL ENJOY", Font = SerifBold(20F), ForeColor = TextPrimary, Location = new Point(84, 2), AutoSize = true };
-            var h1sub = new Label { Text = "JEWSKI TWEAKS \u2014 PERFORMANCE SUITE", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(0x88, 0x88, 0x88), Location = new Point(86, 34), AutoSize = true };
+            var h1 = new Label { Text = "HOPEFULLY YOU'LL ENJOY", Font = SerifBold(20F), ForeColor = Color.White, Location = new Point(84, 2), AutoSize = true };
+            var h1sub = new Label { Text = "WELCOME BACK", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = Color.FromArgb(0x9D, 0xE0, 0x5C), Location = new Point(86, 34), AutoSize = true };
             headerRow.Controls.Add(h1);
             headerRow.Controls.Add(h1sub);
 
             var madeByCol = new Panel { Dock = DockStyle.Right, Width = 230 };
-            var madeBy = new Label { Text = "MADE BY JEWSKI", Font = SerifBold(15F), ForeColor = TextPrimary, Dock = DockStyle.Top, Height = 26, TextAlign = ContentAlignment.MiddleRight };
+            var madeBy = new Label { Text = "MADE BY JEWSKI", Font = SerifBold(15F), ForeColor = Color.White, Dock = DockStyle.Top, Height = 26, TextAlign = ContentAlignment.MiddleRight };
             var btnRestore2 = MakeGradientButton("CREATE RESTORE POINT");
             btnRestore2.Dock = DockStyle.Top;
             btnRestore2.Click += (s, e) => {
@@ -1730,7 +2033,7 @@ namespace JewskiTweaksGUI
                 Task.Run(() => {
                     string r = Sh.RunPS("Enable-ComputerRestore -Drive 'C:\\' -EA SilentlyContinue; Checkpoint-Computer -Description 'Jewski Free Tweaks' -RestorePointType 'MODIFY_SETTINGS'");
                     AppendLog("[Restore Point] " + r);
-                    Invoke((MethodInvoker)(() => { SetBusy(false, "Restore point step finished."); MessageBox.Show(this, "Restore point request sent.", "Jewski Free Tweaks"); }));
+                    Invoke((MethodInvoker)(() => { SetBusy(false, null); ShowToast("Restore point request sent"); }));
                 });
             };
             madeByCol.Controls.Add(btnRestore2);
@@ -1742,10 +2045,10 @@ namespace JewskiTweaksGUI
             // ---------- Discord section ----------
             var communitySection = new Panel { Dock = DockStyle.Top, Height = 92 };
             var eyebrow1 = MakeEyebrow("COMMUNITY");
-            var h2Discord = new Label { Text = "CLICK TO COPY", Dock = DockStyle.Top, Height = 32, Font = SerifBold(18F), ForeColor = TextPrimary };
+            var h2Discord = new Label { Text = "CLICK TO COPY", Dock = DockStyle.Top, Height = 32, Font = SerifBold(18F), ForeColor = Color.White };
             string discordUrl = "https://discord.gg/3c4B6ccV6Z";
             var discordRow = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, AutoSize = false, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
-            var discordLabel = new Label { Text = "DISCORD LINK :  ", Font = SerifBold(13F), ForeColor = TextPrimary, AutoSize = true, Margin = new Padding(0) };
+            var discordLabel = new Label { Text = "DISCORD LINK :  ", Font = SerifBold(13F), ForeColor = Color.White, AutoSize = true, Margin = new Padding(0) };
             var discordUrlLbl = new Label { Text = discordUrl, Font = SerifBold(13F), ForeColor = DiscordBlurple, AutoSize = true, Cursor = Cursors.Hand, Margin = new Padding(0) };
             var discordFont = discordUrlLbl.Font;
             discordUrlLbl.Paint += (s, e) => {
@@ -1759,6 +2062,7 @@ namespace JewskiTweaksGUI
                 try { Clipboard.SetText(discordUrl); } catch { }
                 discordUrlLbl.Text = "Copied to clipboard!";
                 discordUrlLbl.ForeColor = PillGreen;
+                ShowToast("Discord invite copied to clipboard");
                 copyTimer.Stop(); copyTimer.Start();
             };
             discordUrlLbl.Click += copyClick; discordLabel.Click += copyClick;
@@ -1773,7 +2077,7 @@ namespace JewskiTweaksGUI
             // ---------- Computer specs section ----------
             var specsSection = new Panel { Dock = DockStyle.Top, Height = 190 };
             var eyebrow2 = MakeEyebrow("SYSTEM SPECS");
-            var h2Specs = new Label { Text = "COMPUTER SPECS:", Dock = DockStyle.Top, Height = 32, Font = SerifBold(18F), ForeColor = TextPrimary };
+            var h2Specs = new Label { Text = "COMPUTER SPECS:", Dock = DockStyle.Top, Height = 32, Font = SerifBold(18F), ForeColor = Color.White };
             var specsGrid = new TableLayoutPanel { Dock = DockStyle.Top, Height = 130, ColumnCount = 2, RowCount = 2 };
             specsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
             specsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
@@ -1816,10 +2120,33 @@ namespace JewskiTweaksGUI
             return page;
         }
 
+        Panel MakePremiumDivider()
+        {
+            var div = new Panel { Dock = DockStyle.Top, Height = 18, BackColor = HomePurple };
+            div.Paint += (s, e) => {
+                var rect = new Rectangle(0, 8, div.Width, 1);
+                if (rect.Width <= 0) return;
+                using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(0, 0, Math.Max(rect.Width, 1), 1), Color.White, Color.White, 0f))
+                {
+                    var blend = new System.Drawing.Drawing2D.ColorBlend(3);
+                    blend.Colors = new[] { Color.Transparent, Color.FromArgb(90, 255, 255, 255), Color.Transparent };
+                    blend.Positions = new[] { 0f, 0.5f, 1f };
+                    brush.InterpolationColors = blend;
+                    e.Graphics.FillRectangle(brush, rect);
+                }
+            };
+            return div;
+        }
+
+        Label MakeEyebrow(string text)
+        {
+            return new Label { Text = text, Dock = DockStyle.Top, Height = 20, Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.FromArgb(0xD0, 0xB8, 0xF0) };
+        }
+
         Panel MakeSpecCard(string label, string value, Color valueColor)
         {
-            var card = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 8, 8), BackColor = Color.FromArgb(10, 0, 0, 0), Padding = new Padding(20, 14, 20, 14) };
-            var lbl = new Label { Text = label, Dock = DockStyle.Top, Height = 16, Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(0x99, 0x99, 0x99) };
+            var card = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 8, 8), BackColor = Color.FromArgb(0x2E, 0x14, 0x47), Padding = new Padding(20, 14, 20, 14) };
+            var lbl = new Label { Text = label, Dock = DockStyle.Top, Height = 16, Font = new Font("Segoe UI", 7F, FontStyle.Bold), ForeColor = Color.FromArgb(0xC8, 0xB0, 0xE8) };
             var val = new Label { Text = value, Name = "val", Dock = DockStyle.Top, Height = 28, Font = SerifBold(15F), ForeColor = valueColor, AutoEllipsis = true };
             card.Controls.Add(val);
             card.Controls.Add(lbl);
@@ -1854,18 +2181,34 @@ namespace JewskiTweaksGUI
 
         // Same phantom-scrollbar-safe pattern as the sidebar, but here it also enforces
         // a genuine fixed column count (3, per the mockup) instead of "however many fit."
+        // Tabs with a lot of tweaks (Services, Services Advanced, Network...) were visibly
+        // laggy switching in: every resize re-ran RoundCorners (allocates a GraphicsPath +
+        // Region) for every single card even when nothing actually changed size, and a
+        // FlowLayoutPanel re-fires Resize repeatedly during its own layout pass - so 50+
+        // cards each got their Region rebuilt several times per tab switch. Caching the last
+        // width per grid and skipping the no-op case, plus batching with Suspend/ResumeLayout,
+        // cuts that down to one real pass.
+        Dictionary<FlowLayoutPanel, int> _lastGridCardWidth = new Dictionary<FlowLayoutPanel, int>();
+
         void FixGridCardWidths(FlowLayoutPanel grid, int columns)
         {
             int w = grid.ClientSize.Width;
             if (w <= 0) return;
             int cardW = (w / columns) - 18;
             if (cardW < 220) cardW = 220;
+
+            int last;
+            if (_lastGridCardWidth.TryGetValue(grid, out last) && last == cardW) return;
+            _lastGridCardWidth[grid] = cardW;
+
+            grid.SuspendLayout();
             foreach (Control c in grid.Controls)
             {
                 if (!(c is Panel)) continue;
                 c.Width = cardW;
                 RoundCorners(c, 16);
             }
+            grid.ResumeLayout(true);
             grid.HorizontalScroll.Maximum = 0;
             grid.HorizontalScroll.Visible = false;
         }
@@ -1894,8 +2237,26 @@ namespace JewskiTweaksGUI
             tip.SetToolTip(card, tipText);
             tip.SetToolTip(lbl, tipText);
 
-            card.MouseEnter += (s, e) => card.BackColor = PillBlackHover;
-            card.MouseLeave += (s, e) => card.BackColor = PillBlack;
+            card.MouseEnter += (s, e) => { if (card.BackColor == PillBlack) card.BackColor = PillBlackHover; };
+            card.MouseLeave += (s, e) => { if (card.BackColor == PillBlackHover) card.BackColor = PillBlack; };
+
+            // Clicking a card runs that one tweak immediately - no "Apply" step, no confirm
+            // dialog. Only the page-level Apply Recommended / Apply All buttons confirm first.
+            EventHandler run = (s, e) => {
+                card.BackColor = PillSelected;
+                SetBusy(true, "Applying: " + Disp(t.Name));
+                Task.Run(() => {
+                    AppendLog("==== APPLY: " + t.Name + " ====");
+                    try { t.Apply(AppendLog); }
+                    catch (Exception ex) { AppendLog("EXCEPTION: " + ex.Message); }
+                    Invoke((MethodInvoker)(() => {
+                        SetBusy(false, null);
+                        card.BackColor = PillBlack;
+                        ShowToast("Applied: " + Disp(t.Name));
+                    }));
+                });
+            };
+            card.Click += run; lbl.Click += run;
 
             return card;
         }
@@ -1951,14 +2312,33 @@ namespace JewskiTweaksGUI
                 BackColor = AppBg,
                 Padding = new Padding(2, 6, 2, 10)
             };
+            // Faded logo watermark behind the tweak grid. Drawn straight into the panel's own
+            // Paint (runs before child controls render) instead of the BackgroundImage+
+            // transparent-child trick from before - that relied on WinForms' flaky
+            // transparent-backcolor support and visibly flickered/glitched the first time a
+            // tab was shown. Drawn at its native baked size with NO per-paint scaling/
+            // interpolation - that scaling (HighQualityBicubic, recomputed on every repaint)
+            // was the actual cause of the tab-switch lag, not the card rounding.
+            var watermark = TabWatermark();
+            if (watermark != null)
+            {
+                grid.Paint += (s, e) => {
+                    if (grid.Width <= 0 || grid.Height <= 0) return;
+                    int x = (grid.Width - watermark.Width) / 2;
+                    int y = (grid.Height - watermark.Height) / 2;
+                    e.Graphics.DrawImageUnscaled(watermark, x, y);
+                };
+            }
             DarkScroll(grid);
             grid.Resize += (s, e) => FixGridCardWidths(grid, 3);
 
             var tip = new ToolTip { AutoPopDelay = 20000, InitialDelay = 350, ReshowDelay = 100 };
+            grid.SuspendLayout();
             foreach (var t in tweaks)
             {
                 grid.Controls.Add(MakeTweakCard(t, tip));
             }
+            grid.ResumeLayout(true);
             FixGridCardWidths(grid, 3);
             Load += (s, e) => FixGridCardWidths(grid, 3);
 
@@ -2165,9 +2545,9 @@ namespace JewskiTweaksGUI
                 Task.Run(() => {
                     string result = action();
                     Invoke((MethodInvoker)(() => {
-                        SetBusy(false, result);
+                        SetBusy(false, null);
                         card.BackColor = PillBlack;
-                        MessageBox.Show(this, result, "Jewski Free Tweaks");
+                        ShowToast(result);
                     }));
                 });
             };
@@ -2227,7 +2607,7 @@ namespace JewskiTweaksGUI
                 if (apply) PlaySound("JewskiTweaksGUI.Resources.done.mp3", "jewskidone");
                 Invoke((MethodInvoker)(() => {
                     SetBusy(false, null);
-                    MessageBox.Show(this, (apply ? "Applied " : "Reverted ") + tweaks.Count + " tweak(s).\n\nRestart your PC for everything to take full effect.", "Jewski Free Tweaks");
+                    ShowToast((apply ? "Applied " : "Reverted ") + tweaks.Count + " tweak(s) - restart to take full effect");
                 }));
             });
         }
@@ -2298,54 +2678,89 @@ namespace JewskiTweaksGUI
         }
     }
 
-    // Plays the embedded launch video full-screen-ish before the main window shows, via a
-    // WPF MediaElement hosted in a WinForms ElementHost (Media Foundation decodes the mp4 -
-    // no external codec/ffmpeg needed). Click, any key, or an 8s timeout skips it, and any
-    // failure here (missing codec, bad resource, etc.) is swallowed by the caller so a splash
-    // problem can never stop the real app from launching.
+    // The "launch video" turned out to be a completely static frame (identical at 0.1s, 1.5s
+    // and 2.7s - verified by extracting frames) of the logo sitting in the middle of a mostly
+    // black 720x1280 canvas, with the bottom of the "TWEAKS" text cut off in the recording
+    // itself - no amount of window sizing fixes that, the pixels for the full text just don't
+    // exist in that clip. Using the actual clean logo.png (same asset as the sidebar, complete
+    // and already background-removed) with a fade+scale intro gets the same effect without
+    // dragging in WPF/Media Foundation as a dependency - simpler, smaller, and nothing to glitch.
     public class SplashForm : Form
     {
-        System.Windows.Controls.MediaElement _media;
+        PictureBox _logoBox;
+        System.Windows.Forms.Timer _timer;
+        int _phase; // 0=fade/scale in, 1=hold, 2=fade out
+        int _tick;
+        const int FadeInTicks = 18;   // ~270ms at 15ms/tick
+        const int HoldTicks = 55;     // ~825ms
+        const int FadeOutTicks = 16;  // ~240ms
 
-        public SplashForm(string videoPath)
+        public SplashForm(Bitmap logo)
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.Black;
+            BackColor = Color.FromArgb(0xF5, 0xF3, 0xEE);
             ShowInTaskbar = false;
             TopMost = true;
-            Width = 720;
-            Height = 405;
+            Opacity = 0;
+            Width = 320;
+            Height = 320;
 
-            var host = new System.Windows.Forms.Integration.ElementHost { Dock = DockStyle.Fill, BackColorTransparent = false, BackColor = Color.Black };
-            _media = new System.Windows.Controls.MediaElement
-            {
-                LoadedBehavior = System.Windows.Controls.MediaState.Manual,
-                UnloadedBehavior = System.Windows.Controls.MediaState.Manual,
-                Stretch = System.Windows.Media.Stretch.Uniform,
-                Source = new Uri(videoPath)
-            };
-            host.Child = _media;
-            Controls.Add(host);
+            _logoBox = new PictureBox { Image = logo, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Transparent };
+            ResizeLogo(1.0);
+            Controls.Add(_logoBox);
 
-            _media.MediaEnded += (s, e) => Close();
-            _media.MediaFailed += (s, e) => Close();
-            Shown += (s, e) => { try { _media.Play(); } catch { Close(); } };
-
-            EventHandler skip = (s, e) => Close();
+            EventHandler skip = (s, e) => FinishNow();
             Click += skip;
-            host.Click += skip;
-            KeyPress += (s, e) => Close();
+            _logoBox.Click += skip;
+            KeyPress += (s, e) => FinishNow();
             KeyPreview = true;
 
-            var timeout = new System.Windows.Forms.Timer { Interval = 8000 };
-            timeout.Tick += (s, e) => { timeout.Stop(); Close(); };
-            timeout.Start();
+            Shown += (s, e) => {
+                _timer = new System.Windows.Forms.Timer { Interval = 15 };
+                _timer.Tick += Tick;
+                _timer.Start();
+            };
+        }
+
+        void ResizeLogo(double scale)
+        {
+            int size = (int)(220 * scale);
+            _logoBox.Size = new Size(size, size);
+            _logoBox.Location = new Point((Width - size) / 2, (Height - size) / 2);
+        }
+
+        void Tick(object s, EventArgs e)
+        {
+            _tick++;
+            if (_phase == 0)
+            {
+                double p = Math.Min(1.0, _tick / (double)FadeInTicks);
+                Opacity = p;
+                ResizeLogo(0.85 + 0.15 * p);
+                if (p >= 1.0) { _phase = 1; _tick = 0; }
+            }
+            else if (_phase == 1)
+            {
+                if (_tick >= HoldTicks) { _phase = 2; _tick = 0; }
+            }
+            else
+            {
+                double p = Math.Min(1.0, _tick / (double)FadeOutTicks);
+                Opacity = 1.0 - p;
+                if (p >= 1.0) Close();
+            }
+        }
+
+        void FinishNow()
+        {
+            if (_timer != null) _timer.Stop();
+            Close();
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            try { _media.Close(); } catch { }
+            if (_timer != null) _timer.Stop();
             base.OnFormClosed(e);
         }
     }
@@ -2375,12 +2790,11 @@ namespace JewskiTweaksGUI
         static void ShowSplash()
         {
             var asm = System.Reflection.Assembly.GetExecutingAssembly();
-            using (var s = asm.GetManifestResourceStream("JewskiTweaksGUI.Resources.launch.mp4"))
+            using (var s = asm.GetManifestResourceStream("JewskiTweaksGUI.Resources.logo.png"))
             {
                 if (s == null) return;
-                string tmp = Path.Combine(Path.GetTempPath(), "jewski_launch.mp4");
-                using (var fs = File.Create(tmp)) s.CopyTo(fs);
-                using (var splash = new SplashForm(tmp))
+                var logo = new Bitmap(s);
+                using (var splash = new SplashForm(logo))
                 {
                     Application.Run(splash);
                 }
