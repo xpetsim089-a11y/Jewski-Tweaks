@@ -7,7 +7,7 @@ A checkbox-driven Windows tweak tool: pick individual performance/privacy/networ
 Paste into PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/USERNAME/REPO/main/run.ps1 | iex
+irm https://raw.githubusercontent.com/xpetsim089-a11y/Jewski-Tweaks/main/run.ps1 | iex
 ```
 
 That downloads the latest `JewskiTweaks.exe` from this repo's [Releases](../../releases) page and launches it. You'll get a UAC prompt - the app needs admin rights to change services, the registry, and power settings.
