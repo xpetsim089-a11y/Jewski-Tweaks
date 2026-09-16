@@ -20,11 +20,17 @@ Grab `JewskiFreeTweaks.exe` from the [latest release](../../releases/latest) and
 
 - 150+ individual tweaks across Power, Network/Ethernet, Audio, Input, Visual Effects, Privacy, Gaming/GPU, Startup, Debloat, Services, Scheduled Tasks, Storage, and RAM/Boot tuning
 - Every tweak shows its real effect, risk level (Safe / Moderate / Advanced), and has its own individual revert
-- A live Startup Apps manager and a few one-click fixes (restore mic access, restart audio, restart Explorer, rebuild icon cache)
-- Nothing is applied until you check boxes and click Apply - creating a System Restore Point first is one click
-- Plays a short sound on launch and another when a tweak batch finishes applying
+- Each category page has its own "Apply Recommended" / "Apply All" - no global batch button, so you always know exactly what you're about to change
+- A live Startup Apps manager (real registry scan, publisher pulled from the actual exe) and a few one-click Fixes (restore mic access, restart audio, restart Explorer, rebuild icon cache)
+- Nothing is applied until you click Apply on a page - creating a System Restore Point first is one click on the Home tab
+- A short launch video/animation plays on startup, plus a sound on launch and another when a tweak batch finishes applying
+- A busy overlay with live progress ("Applying 3/9: ...") shows during any Apply/Revert/Fix so nothing looks frozen
+
+## Building from source
+
+Clone the repo and run `build_jewski.ps1` from PowerShell - it compiles `Program.cs` with the plain C# compiler that ships with .NET Framework (no Visual Studio, no SDK, no NuGet). Output is `JewskiFreeTweaks.exe` in the repo folder.
 
 ## Safety notes
 
 - Nothing here bypasses Windows security features by design; a few "Advanced"-tagged tweaks intentionally trade off things like driver-update protection or SYN-flood defenses, and are unchecked by default with the tradeoff explained in the app
-- Source is plain C#/WinForms, compiled with the standard .NET Framework compiler that ships with Windows - no external runtime, no telemetry, no network calls except the one-time download above
+- Source is plain C#/WinForms (`Program.cs` in this repo), compiled with the standard .NET Framework compiler that ships with Windows - no external runtime, no telemetry, no network calls except the one-time download above
